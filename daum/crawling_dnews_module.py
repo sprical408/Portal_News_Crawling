@@ -34,19 +34,8 @@ from dateutil.relativedelta import relativedelta
 @contents daum 뉴스 크롤링
 """
 
-# -*- coding: utf-8 -*-
-
-# from data_crawling_analysis.env import env_common -> 현 상황 불필요
-
-# 서비스 환경별 구분 -> 현 상황 불필요
-# service_type = env_common.service_type()
-# crawling_json_url = service_type['crawling_json_url']
-# crawling_path = service_type['crawling_path']
-# chromedriver = service_type['chromedriver']
-# directory_bar = service_type['directory_bar']
-
-crawling_path = './data/'  # By MIN
-directory_bar = './'  # By MIN
+crawling_path = './data/'
+directory_bar = './'
 
 
 def get_url_link(url: str, keywordstorageNm):
@@ -74,56 +63,40 @@ def do_html_crawl(url: str, keywordstorageNm: str):
     ps1 = ps[1]
 
     # driver = env_common.chrom_type(crawling_path, chromedriver, 'site', url)
-    driver = webdriver.Chrome('./chromedriver_win32/chromedriver')  # By MIN
+    options = Options()
+    userAgent_name = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36 Edg/109.0.1518.70'
+    options.add_argument(f'user-agent={userAgent_name}')
+    driver = webdriver.Chrome(chrome_options=options, executable_path='./chromedriver_win32/chromedriver')
 
     driver.implicitly_wait(7)
     driver.get(url)
+
     time.sleep(1)
 
     # URL 및 Title 크롤링 시작
     for i in range(1, 11):
         try:
-            article_raw = driver.find_elements(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div[2]/a')
+            article_raw = driver.find_elements(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div/a')
+
             for article in article_raw:
-                url_each = article.get_attribute('href')
-                url_list.append(url_each)
-            title_each = driver.find_elements(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div[2]/a')[0].text
+                url_list.append(article.get_attribute('href'))
+
+            url_list = list(set(url_list))
+
+            try:
+                title_each = driver.find_elements(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div[2]/a')[0].text
+            except:
+                title_each = driver.find_elements(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div/a')[0].text
             title_list.append(title_each)
 
         except:
             break
 
+
     df = pd.DataFrame({'url': url_list, 'title': title_list, 'ps': ps1})
 
     driver.close()
     driver.quit()
-
-    if df.empty:
-        # driver = env_common.chrom_type(crawling_path, chromedriver, 'site', url)
-        time.sleep(1)
-
-        # URL 및 Title 크롤링 시작
-        for i in range(1, 11):
-            try:
-                article_raw = driver.find_elements(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div[2]/a')
-                for article in article_raw:
-                    url_each = article.get_attribute('href')
-                    url_list.append(url_each)
-                time.sleep(1)
-
-                title_each = driver.find_element(By.XPATH, f'//*[@id="newsColl"]/div[1]/ul/li[{i}]/div[2]/a').text
-                title_list.append(title_each)
-                time.sleep(1)
-
-            except:
-                break
-
-        z = random.randint(1, 9)
-        ps = 8 + z
-
-        df = pd.DataFrame({'url': url_list, 'title': title_list, 'ps': ps})
-        driver.close()
-        driver.quit()
 
     return df
 
@@ -161,6 +134,7 @@ def do_thread_crawl(urls: list, keywordstorageNm):
 
             # else:
             #     result.to_csv(crawling_path + keywordstorageNm + directory_bar + keywordstorageNm + '_news_url_' +
+
             #                   str(ps) + '.csv', index=False, mode='a', encoding='utf-8-sig', header=False)
 
         for execution in concurrent.futures.as_completed(thread_list):
@@ -170,16 +144,20 @@ def do_thread_crawl(urls: list, keywordstorageNm):
 def crawling(keyword, keywordstorageNm, crawlingSdate, crawlingEdate):
     # Step 1. "다음" 사이트 열기
     # driver = env_common.chrom_type(crawling_path, chromedriver, 'channel','naver')
+
+    url = f'https://search.daum.net/search?w=news&DA=STC&enc=utf8&cluster=n&cluster_page=1&q={keyword}&period=u&sd={crawlingSdate}000000&ed={crawlingEdate}235959&p=1'
+
     options = Options()
     ua = UserAgent()
     userAgent = ua.random
     print(userAgent)
-    options.add_argument(f'user-agent={userAgent}')  # CM
-    driver = webdriver.Chrome(chrome_options=options, executable_path='./chromedriver_win32/chromedriver')  # By MIN
+    options.add_argument(f'user-agent={userAgent}')
+    driver = webdriver.Chrome(chrome_options=options, executable_path='./chromedriver_win32/chromedriver')
 
-    driver.implicitly_wait(7)
-    driver.get('https://www.daum.net/')
+    driver.implicitly_wait(3)
+    driver.get(url)
 
+    '''
     # Step 2 . 검색창에서 "검색어" 검색
     element = driver.find_element(By.NAME, "q")
     element.send_keys(keyword)
@@ -189,16 +167,18 @@ def crawling(keyword, keywordstorageNm, crawlingSdate, crawlingEdate):
     # Step 3. "뉴스" 카테고리 선택
     driver.find_element(By.LINK_TEXT, "뉴스").click()
     time.sleep(1)
+    
 
     # Step 4. 선택된 기간에 대한 검색 결과 클릭
     search_url = (
         "https://search.daum.net/search?w=news&DA=STC&enc=utf8&cluster=n&cluster_page=1&q={0}&period=u&sd={1}000000&ed={2}235959&p=1".format(
             keyword, crawlingSdate, crawlingEdate))
     driver.get(search_url)
-
+    
     # 관련뉴스 닫기 (더 많은 기사를 보기 위해서)
     # driver.find_element(By.LINK_TEXT, "관련뉴스 닫기").click()
     # time.sleep(1)
+    '''
 
     # 전체 게시물 갯수 확인
     article_cnt = driver.find_element(By.CLASS_NAME, "txt_info").text.split(' ')[-1].replace('건', '').replace(',','').strip()
@@ -270,10 +250,10 @@ def crawling(keyword, keywordstorageNm, crawlingSdate, crawlingEdate):
 
 
 if __name__ == "__main__":
-    keyword = "체크카드발급"
-    keywordstorageNm = "admin_13_체크카드발급_2023"
+    keyword = "메가커피"
+    keywordstorageNm = "admin_13_메가커피_2023"
     crawlingSdate = "20230201"
-    crawlingEdate = "20230203"
+    crawlingEdate = "202302010"
     crawlingFile = crawling(keyword, keywordstorageNm, crawlingSdate, crawlingEdate)
     # url = "https://search.naver.com/search.naver?where=news&sm=tab_pge&query=%EC%9C%A4%EC%84%9D%EC%97%B4&sort=0&photo=0&field=0&pd=3&ds=2022.12.30&de=2022.12.30&cluster_rank=18&mynews=0&office_type=0&office_section_code=0&news_office_checked=&nso=so:r,p:from20221230to20221230,a:all"
     # do_html_crawl(url, keywordstorageNm)
