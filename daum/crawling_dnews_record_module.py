@@ -103,7 +103,7 @@ def crawl_and_save_text(keyword):
     driver.close()
 
     print('File Mergin Succeed..!')
-    sleep(2)
+    sleep(3)
 
 if __name__ == "__main__":
     keyword = "메가커피"
