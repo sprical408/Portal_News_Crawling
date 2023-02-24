@@ -35,7 +35,7 @@ from multiprocessing import Pool
 from multiprocessing.pool import ThreadPool
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from functools import partial
-from urllib.request import urlopen
+import urllib
 import requests
 import time  # 시간 지연
 from time import sleep
@@ -63,9 +63,12 @@ directory_bar = '/' # By MIN
 
 def get_url_link(url: str):
     url_link = []
-
+    # 403 Error 방지를 위한 추가 헤더 설정
+    headers = {'User-Agent':
+                   'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/109.0.0.0 Safari/537.36 Edg/109.0.1518.70'}
     try:
-        response = urlopen(url)
+        req = urllib.request.Request(url, headers=headers)
+        response = urlopen(req)
 
         if response.status == 200:
             url_link.append(url)
@@ -126,7 +129,6 @@ def do_html_crawl(url: str, title, keywordstorageNm: str, ps: str):
     
     url_list = []
     title_list = []
-    print(f'fwefwe==={title}')
     result_df = work_crawling(url,title, ps)
         
     if result_df.empty:
@@ -147,9 +149,8 @@ def do_thread_crawl(urls: list,titles : list, keywordstorageNm):
     thread_list = []
 
     with ThreadPoolExecutor(max_workers=8) as executor:
-        print(f'do_thread_crawl len url = {len(urls)}')
         for url in urls:
-            addinfo = url.split("||")
+            addinfo = url.split("_")
             crawlingChannel = addinfo[1]
             ps = addinfo[2]
             try:
@@ -200,20 +201,18 @@ def crawling_record(keyword, crawlingIdx, crawlingFile, keywordstorageNm, crawli
     # "url_list.csv" 불러오기
     print(crawling_path+keywordstorageNm+directory_bar+crawlingFile)
     url_load = pd.read_csv(crawling_path+keywordstorageNm+directory_bar+crawlingFile, encoding='utf-8-sig')
-    print(url_load)
     num_list = len(url_load)
-    print(f'num_list : {num_list}')
     # 수집할 글 갯수
     number = num_list
 
     for i in tqdm(numpy.arange(0, number)): 
         choicelist = random.choice(code_list)
-        addinfo = crawlingChannel+'||'+str(choicelist)
+        addinfo = crawlingChannel+'_'+str(choicelist)
 
         titles.append(url_load['title'][i])
         url = url_load['url'][i]
         url = url.strip()
-        url = url+'?||'+addinfo
+        url = url+'?_'+addinfo
         urls.append(url)    
         print(i,url)
             
